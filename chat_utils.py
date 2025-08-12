@@ -1,86 +1,61 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import re
+
+from twenty_questions.prompts import create_questions_prompt
+
+"""
+TODO: Create chat utilities to get LLM responses for multiple different
+LLMs.
+
+Also, make sure we can include history between two agents
+"""
 
 
-def ask_llm(): ...
+def ask_llm(message: str) -> str: ...
 
-
-# Create dataclass thats
-# question
-# items yes
-# item no
-# Return a list of that
 
 @dataclass
-class QuestionSplit:
+class Question:
     question: str
-    items_yes: list[str]
-    items_no: list[str]
+    items_yes: list[str] = field(default_factory=list)
+    items_no: list[str] = field(default_factory=list)
 
-def create_questions(items: list[str], previous_questions: list[str], n: int)
 
-def ques_and_cls_given_items(task, items: list, n, asked_ques: list = None, rest=False):
-    response = get_response_method(task.guesser_model)
+def create_questions(
+    items: list[str], previous_questions: list[str], n: int
+) -> list[Question]:
     if len(items) <= 1:
-        return None
+        return []
 
-    asked = (
-        "(The question should not be '" + "' or '".join(asked_ques) + "')"
-        if asked_ques
-        else ""
-    )
-    message = [
-        {
-            "role": "user",
-            "content": task.prompts.generate_prompt.format(
-                items_str=", ".join(items), n=n, asked=asked
-            ),
-        }
-    ]
-    print(message)
-    rsp = "#" + response(message, model=task.guesser_model, max_tokens=2000)
-    print([rsp])
+    message = create_questions_prompt(items, previous_questions, n)
+    response = ask_llm(message)
 
-    def process_ans(rsp):
-        ans = []
-        for i in range(n):
-            if f"Question {i + 1}: " not in rsp:
-                continue
-            rsp = rsp.split(f"Question {i + 1}: ", 1)[1]
-            q = rsp.split("\n", 1)[0]
-            rsp = rsp.split("YES: ", 1)[1]
-            if rsp[0] == "\n":
-                continue
-            items_y = rsp.split("\n", 1)[0].split(", ")
-            items_y = list(set(items_y))
-            rsp = (
-                rsp.split("\nNO: ", 1)[1]
-                if "\nNO: " in rsp
-                else rsp.split("NO: ", 1)[1]
+    questions = []
+    current_question = None
+
+    for line in response.splitlines():
+        line = line.strip()
+        question_match = re.match(r".*Question\s+\d+:\s*(.+\?)", line, re.IGNORECASE)
+        yes_match = re.match(r"YES:\s*(.+)", line, re.IGNORECASE)
+        no_match = re.match(r"NO:\s*(.+)", line, re.IGNORECASE)
+
+        if question_match:
+            current_question = Question(question_match.group(1))
+            questions.append(current_question)
+            continue
+
+        if not current_question:
+            continue
+
+        if yes_match:
+            items_str = yes_match.group(1)
+            current_question.items_yes.extend(
+                item.strip() for item in items_str.split(",") if item.strip()
             )
-            if rsp[0] == "\n":
-                continue
-            items_n = rsp.split("\n", 1)[0].split(", ")
-            items_n = list(set(items_n))
-            ans.append({"question": q, "items_yes": items_y, "items_no": items_n})
-        return ans
+        elif no_match:
+            items_str = no_match.group(1)
+            current_question.items_no.extend(
+                item.strip() for item in items_str.split(",") if item.strip()
+            )
 
-    def format_rsp(rsp):
-        gpt3_response = get_response_method("gpt-3.5-turbo")
-        message.append({"role": "system", "content": rsp})
-        message.append(
-            {
-                "role": "user",
-                "content": task.prompts.format_generated_prompt.format(rsp=rsp),
-            }
-        )
-        return gpt3_response(message, "gpt-3.5-turbo", max_tokens=500)
-
-    try:
-        return process_ans(rsp)
-    except Exception:
-        try:
-            rsp = format_rsp(rsp)
-            return process_ans(rsp)
-        except Exception as e:
-            print(e)
-            return ques_and_cls_given_items(task, items, n, asked_ques, rest)
+    return questions

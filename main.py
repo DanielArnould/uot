@@ -1,8 +1,5 @@
 def main():
-    print("Hello from uot!")
-
-class UoTNode:
-    
+    print("Oh :(. I'm not ready yet!")
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@ def create_questions_prompt(
     items: list[str], previous_questions: list[str], n: int
 ) -> str:
     do_not_ask_previous_questions = (
-        f"(The question should not be '" + "' or '".join(previous_questions) + "')"
+        "(The question should not be '" + "' or '".join(previous_questions) + "')"
         if previous_questions
         else ""
     )
@@ -39,7 +39,7 @@ def guesser_prologue() -> str:
     """
 
 
-def answerer_prologue(item: str) -> str:
+def examiner_prologue(item: str) -> str:
     return f"""Let us play the game of 20 questions. You are the answerer and I am the guesser. X is '{item}'. 
     I will ask you up to 20 questions and you should answer each one truthfully based on being X. 
     If I guess correctly what X is, answer me "You guessed it. X is '{item}'."
